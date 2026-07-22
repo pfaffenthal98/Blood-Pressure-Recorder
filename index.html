@@ -127,9 +127,11 @@
   .table-wrap{
     max-height: 480px;
     overflow-y:auto;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
     border:3px solid var(--black);
   }
-  table{ width:100%; border-collapse:collapse; font-family: Arial, sans-serif; }
+  table{ width:100%; min-width:640px; border-collapse:collapse; font-family: Arial, sans-serif; }
   thead th{
     position: sticky;
     top:0;
@@ -246,6 +248,17 @@
     margin-top: 10px;
   }
 
+  .table-scroll-hint{
+    display:none;
+    font-family:Arial, sans-serif;
+    font-size:0.75rem;
+    opacity:0.65;
+    margin-bottom:8px;
+  }
+  @media (max-width:680px){
+    .table-scroll-hint{ display:block; }
+  }
+
   @media (max-width:520px){
     .row2{ grid-template-columns:1fr; }
     body{ padding:14px; }
@@ -332,6 +345,7 @@
   <div class="panel-head">
     <h2 id="t_historyTitle">Storico misurazioni</h2>
   </div>
+  <div class="table-scroll-hint" id="t_scrollHint"></div>
   <div id="tableHolder"></div>
 </div>
 
@@ -477,7 +491,8 @@ const STRINGS = {
     overwriteMine: 'Sovrascrivi con i ricevuti',
     toastAdded: n => `${n} nuove misurazioni aggiunte dal link condiviso.`,
     toastOverwritten: n => `${n} misurazioni aggiornate con i valori ricevuti.`,
-    toastKept: 'Hai mantenuto i tuoi valori originali.'
+    toastKept: 'Hai mantenuto i tuoi valori originali.',
+    scrollHint: '↔ Scorri lateralmente per vedere tutte le colonne'
   },
   en: {
     pageTitle: 'Blood Pressure Tracker',
@@ -531,7 +546,8 @@ const STRINGS = {
     overwriteMine: 'Overwrite with received',
     toastAdded: n => `${n} new readings added from the shared link.`,
     toastOverwritten: n => `${n} readings updated with received values.`,
-    toastKept: 'You kept your original values.'
+    toastKept: 'You kept your original values.',
+    scrollHint: '↔ Swipe sideways to see all columns'
   }
 };
 const T = STRINGS[LANG];
@@ -570,6 +586,7 @@ function applyStaticStrings(){
   document.getElementById('t_importTitle').textContent = T.importTitle;
   document.getElementById('btnKeepMine').textContent = T.keepMine;
   document.getElementById('btnOverwriteMine').textContent = T.overwriteMine;
+  document.getElementById('t_scrollHint').textContent = T.scrollHint;
 }
 
 /* ---------------- Data layer ---------------- */
