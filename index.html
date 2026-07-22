@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pressometro / Blood Pressure Tracker</title>
+<style>
+  :root{
+    --black:#111111;
+    --cream:#FFF7E0;
+    --yellow:#FFD400;
+    --pink:#FF4FA0;
+    --blue:#3E7BFA;
+    --green:#33D17A;
+    --red:#FF4136;
+    --shadow-off: 6px 6px 0 var(--black);
+    --shadow-off-sm: 4px 4px 0 var(--black);
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background:var(--cream);
+    background-image:
+      radial-gradient(circle, rgba(17,17,17,0.06) 1.5px, transparent 1.5px);
+    background-size: 22px 22px;
+    font-family: 'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color:var(--black);
+    padding: 24px;
+  }
+
+  h1,h2,h3{ margin:0; text-transform:uppercase; letter-spacing:-0.5px; }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:28px;
+    border:4px solid var(--black);
+    background:var(--yellow);
+    box-shadow: var(--shadow-off);
+    padding: 18px 24px;
+  }
+
+  .topbar h1{ font-size: clamp(1.4rem, 3.5vw, 2.2rem); }
+  .topbar .sub{ font-weight:normal; font-family: Arial, sans-serif; font-size:0.85rem; margin-top:4px; }
+
+  .btn{
+    font-family:inherit;
+    font-weight:bold;
+    text-transform:uppercase;
+    border:4px solid var(--black);
+    background:var(--black);
+    color:var(--cream);
+    padding: 12px 20px;
+    cursor:pointer;
+    box-shadow: var(--shadow-off-sm);
+    transition: transform .08s ease;
+    font-size:0.95rem;
+    white-space:nowrap;
+  }
+  .btn:active{ transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--black); }
+  .btn.primary{ background:var(--pink); color:var(--black); }
+  .btn.secondary{ background:var(--cream); color:var(--black); }
+  .btn.danger{ background:var(--red); color:var(--cream); }
+
+  .stats-row{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap:18px;
+    margin-bottom: 24px;
+  }
+  .stat-card{
+    border:4px solid var(--black);
+    background:white;
+    box-shadow: var(--shadow-off);
+    padding: 16px 18px;
+  }
+  .stat-card .label{
+    font-size:0.75rem;
+    font-family:Arial, sans-serif;
+    font-weight:bold;
+    text-transform:uppercase;
+    opacity:0.7;
+    margin-bottom:6px;
+  }
+  .stat-card .value{
+    font-size:2.1rem;
+    line-height:1;
+  }
+  .stat-card .unit{ font-size:1rem; opacity:0.6; }
+  .stat-card.sys{ border-left:10px solid var(--pink); }
+  .stat-card.dia{ border-left:10px solid var(--blue); }
+  .stat-card.hr{ border-left:10px solid var(--green); }
+  .stat-card.days{ border-left:10px solid var(--black); }
+
+  .panel{
+    border:4px solid var(--black);
+    background:white;
+    box-shadow: var(--shadow-off);
+    margin-bottom: 28px;
+    padding: 20px;
+  }
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  .legend{ display:flex; gap:16px; font-family:Arial, sans-serif; font-size:0.8rem; font-weight:bold; flex-wrap:wrap; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend i{ width:14px; height:14px; display:inline-block; border:2px solid var(--black); }
+
+  .empty-state{
+    text-align:center;
+    padding: 40px 20px;
+    font-family:Arial, sans-serif;
+  }
+  .empty-state .big{ font-size:2.5rem; margin-bottom:10px; }
+
+  .table-wrap{
+    max-height: 480px;
+    overflow-y:auto;
+    border:3px solid var(--black);
+  }
+  table{ width:100%; border-collapse:collapse; font-family: Arial, sans-serif; }
+  thead th{
+    position: sticky;
+    top:0;
+    background:var(--black);
+    color:var(--cream);
+    text-align:left;
+    padding: 12px 10px;
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+    z-index:2;
+    border-bottom:3px solid var(--black);
+  }
+  tbody td{
+    padding: 12px 10px;
+    border-bottom: 2px solid #eee;
+    font-size:0.92rem;
+  }
+  tbody tr:hover{ background: #FFF3B0; }
+  tbody tr:nth-child(even){ background: #FAFAFA; }
+  tbody tr:nth-child(even):hover{ background: #FFF3B0; }
+
+  .badge{
+    display:inline-block;
+    padding: 3px 8px;
+    border:2px solid var(--black);
+    font-weight:bold;
+    font-size:0.8rem;
+  }
+  .badge.high{ background:var(--red); color:white; }
+  .badge.ok{ background:var(--green); color:black; }
+
+  .icon-btn{
+    border:2px solid var(--black);
+    background:white;
+    width:34px; height:34px;
+    cursor:pointer;
+    font-size:1rem;
+    margin-right:6px;
+    box-shadow: 3px 3px 0 var(--black);
+  }
+  .icon-btn:active{ transform: translate(2px,2px); box-shadow:none; }
+  .icon-btn.edit:hover{ background:var(--yellow); }
+  .icon-btn.del:hover{ background:var(--red); color:white; }
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0;
+    background: rgba(17,17,17,0.6);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:var(--cream);
+    border:4px solid var(--black);
+    box-shadow: 10px 10px 0 var(--black);
+    padding: 26px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .modal h2{ margin-bottom: 18px; font-size:1.3rem; }
+  .modal.confirm h2{ color: var(--red); }
+
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block;
+    font-family:Arial, sans-serif;
+    font-weight:bold;
+    font-size:0.8rem;
+    text-transform:uppercase;
+    margin-bottom:5px;
+  }
+  .field input{
+    width:100%;
+    border:3px solid var(--black);
+    padding:10px 12px;
+    font-size:1rem;
+    font-family:Arial, sans-serif;
+    background:white;
+  }
+  .field input:focus{ outline:none; background:#FFF3B0; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:20px;
+  }
+
+  footer.hint{
+    font-family:Arial, sans-serif;
+    font-size:0.75rem;
+    opacity:0.6;
+    text-align:center;
+    margin-top: 10px;
+  }
+
+  @media (max-width:520px){
+    .row2{ grid-template-columns:1fr; }
+    body{ padding:14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1 id="t_title">🩺 Pressometro</h1>
+    <div class="sub" id="t_subtitle">Registro pressione e battiti — i dati restano solo su questo dispositivo</div>
+  </div>
+  <button class="btn primary" id="btnAdd"></button>
+</div>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2 id="t_chartTitle">Andamento medie giornaliere</h2>
+    <div class="legend">
+      <span><i style="background:var(--pink)"></i><span id="t_legendSys"></span></span>
+      <span><i style="background:var(--blue)"></i><span id="t_legendDia"></span></span>
+      <span><i style="background:var(--green)"></i><span id="t_legendHr"></span></span>
+    </div>
+  </div>
+  <div id="chartHolder"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <h2 id="t_historyTitle">Storico misurazioni</h2>
+  </div>
+  <div id="tableHolder"></div>
+</div>
+
+<footer class="hint" id="t_footer"></footer>
+
+<!-- Add/edit modal -->
+<div class="overlay" id="formOverlay">
+  <div class="modal">
+    <h2 id="formTitle"></h2>
+    <form id="measureForm">
+      <input type="hidden" id="editId">
+      <div class="row2">
+        <div class="field">
+          <label for="fDate" id="t_lblDate">Data</label>
+          <input type="date" id="fDate" required>
+        </div>
+        <div class="field">
+          <label for="fTime" id="t_lblTime">Ora</label>
+          <input type="time" id="fTime" required>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="fSys" id="t_lblSys">Sistolica (max)</label>
+          <input type="number" id="fSys" min="50" max="300" required>
+        </div>
+        <div class="field">
+          <label for="fDia" id="t_lblDia">Diastolica (min)</label>
+          <input type="number" id="fDia" min="30" max="200" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="fHr" id="t_lblHr">Battiti (bpm)</label>
+        <input type="number" id="fHr" min="20" max="250" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="btnCancelForm"></button>
+        <button type="submit" class="btn primary" id="btnSaveForm"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="overlay" id="deleteOverlay">
+  <div class="modal confirm">
+    <h2 id="t_deleteTitle"></h2>
+    <p style="font-family:Arial, sans-serif;" id="t_deleteBody"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="btnCancelDelete"></button>
+      <button type="button" class="btn danger" id="btnConfirmDelete"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'pressometro_misurazioni_v1';
+
+/* ---------------- i18n ---------------- */
+const LANG = (navigator.language || navigator.userLanguage || 'en').toLowerCase().startsWith('it') ? 'it' : 'en';
+document.documentElement.lang = LANG;
+
+const STRINGS = {
+  it: {
+    pageTitle: 'Pressometro — Monitoraggio Pressione e Battiti',
+    title: '🩺 Pressometro',
+    subtitle: 'Registro pressione e battiti — i dati restano solo su questo dispositivo',
+    addBtn: '+ Aggiungi misurazione',
+    chartTitle: 'Andamento medie giornaliere',
+    legendSys: 'Sistolica',
+    legendDia: 'Diastolica',
+    legendHr: 'Battiti',
+    historyTitle: 'Storico misurazioni',
+    footer: 'Dati salvati in localStorage del browser. Cancellando i dati di navigazione perderai lo storico.',
+    lblDate: 'Data', lblTime: 'Ora', lblSys: 'Sistolica (max)', lblDia: 'Diastolica (min)', lblHr: 'Battiti (bpm)',
+    phSys: 'es. 120', phDia: 'es. 80', phHr: 'es. 70',
+    formTitleNew: 'Nuova misurazione',
+    formTitleEdit: 'Modifica misurazione',
+    cancel: 'Annulla',
+    save: 'Salva',
+    deleteTitle: 'Eliminare questa misurazione?',
+    deleteBody: "L'operazione non è reversibile.",
+    delete: 'Elimina',
+    noDataStat: 'Nessun dato ancora',
+    statSys: 'La tua media sistolica',
+    statDia: 'La tua media diastolica',
+    statHr: 'I tuoi battiti medi',
+    statDays: 'Giorni monitorati',
+    unitMmhg: 'mmHg',
+    unitBpm: 'bpm',
+    chartEmpty: 'Ancora nessuna misurazione registrata.<br>Aggiungine una per vedere il grafico.',
+    tableEmpty: 'Nessuna misurazione registrata.<br>Premi "Aggiungi misurazione" per iniziare.',
+    thDate: 'Data', thTime: 'Ora', thSys: 'Sist.', thDia: 'Diast.', thHr: 'Batt.', thStatus: 'Stato', thActions: 'Azioni',
+    badgeHigh: 'ALTA', badgeOk: 'OK',
+    editTitle: 'Modifica', deleteIconTitle: 'Elimina',
+    dateFmt: 'dmy'
+  },
+  en: {
+    pageTitle: 'Blood Pressure Tracker',
+    title: '🩺 Blood Pressure Tracker',
+    subtitle: 'Blood pressure & heart rate log — data stays only on this device',
+    addBtn: '+ Add reading',
+    chartTitle: 'Daily average trend',
+    legendSys: 'Systolic',
+    legendDia: 'Diastolic',
+    legendHr: 'Heart rate',
+    historyTitle: 'Reading history',
+    footer: "Data is saved in your browser's localStorage. Clearing browsing data will erase your history.",
+    lblDate: 'Date', lblTime: 'Time', lblSys: 'Systolic (max)', lblDia: 'Diastolic (min)', lblHr: 'Heart rate (bpm)',
+    phSys: 'e.g. 120', phDia: 'e.g. 80', phHr: 'e.g. 70',
+    formTitleNew: 'New reading',
+    formTitleEdit: 'Edit reading',
+    cancel: 'Cancel',
+    save: 'Save',
+    deleteTitle: 'Delete this reading?',
+    deleteBody: 'This action cannot be undone.',
+    delete: 'Delete',
+    noDataStat: 'No data yet',
+    statSys: 'Your average systolic',
+    statDia: 'Your average diastolic',
+    statHr: 'Your average heart rate',
+    statDays: 'Days tracked',
+    unitMmhg: 'mmHg',
+    unitBpm: 'bpm',
+    chartEmpty: 'No readings recorded yet.<br>Add one to see the chart.',
+    tableEmpty: 'No readings recorded yet.<br>Press "Add reading" to get started.',
+    thDate: 'Date', thTime: 'Time', thSys: 'Sys.', thDia: 'Dia.', thHr: 'HR', thStatus: 'Status', thActions: 'Actions',
+    badgeHigh: 'HIGH', badgeOk: 'OK',
+    editTitle: 'Edit', deleteIconTitle: 'Delete',
+    dateFmt: 'mdy'
+  }
+};
+const T = STRINGS[LANG];
+
+function applyStaticStrings(){
+  document.title = T.pageTitle;
+  document.getElementById('t_title').textContent = T.title;
+  document.getElementById('t_subtitle').textContent = T.subtitle;
+  document.getElementById('btnAdd').textContent = T.addBtn;
+  document.getElementById('t_chartTitle').textContent = T.chartTitle;
+  document.getElementById('t_legendSys').textContent = T.legendSys;
+  document.getElementById('t_legendDia').textContent = T.legendDia;
+  document.getElementById('t_legendHr').textContent = T.legendHr;
+  document.getElementById('t_historyTitle').textContent = T.historyTitle;
+  document.getElementById('t_footer').textContent = T.footer;
+  document.getElementById('t_lblDate').textContent = T.lblDate;
+  document.getElementById('t_lblTime').textContent = T.lblTime;
+  document.getElementById('t_lblSys').textContent = T.lblSys;
+  document.getElementById('t_lblDia').textContent = T.lblDia;
+  document.getElementById('t_lblHr').textContent = T.lblHr;
+  document.getElementById('fSys').placeholder = T.phSys;
+  document.getElementById('fDia').placeholder = T.phDia;
+  document.getElementById('fHr').placeholder = T.phHr;
+  document.getElementById('btnCancelForm').textContent = T.cancel;
+  document.getElementById('btnSaveForm').textContent = T.save;
+  document.getElementById('t_deleteTitle').textContent = T.deleteTitle;
+  document.getElementById('t_deleteBody').textContent = T.deleteBody;
+  document.getElementById('btnCancelDelete').textContent = T.cancel;
+  document.getElementById('btnConfirmDelete').textContent = T.delete;
+}
+
+/* ---------------- Data layer ---------------- */
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveData(data){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function uid(){ return 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+let data = loadData();
+let deleteTargetId = null;
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function nowTimeStr(){
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fmtDateLocal(dateStr){
+  const [y,m,d] = dateStr.split('-');
+  return T.dateFmt === 'dmy' ? `${d}/${m}/${y}` : `${m}/${d}/${y}`;
+}
+
+/* ---------------- Aggregation ---------------- */
+function dailyAverages(){
+  const byDay = {};
+  data.forEach(m=>{
+    if(!byDay[m.date]) byDay[m.date] = {sys:[], dia:[], hr:[]};
+    byDay[m.date].sys.push(m.sys);
+    byDay[m.date].dia.push(m.dia);
+    byDay[m.date].hr.push(m.hr);
+  });
+  const days = Object.keys(byDay).sort();
+  return days.map(date=>{
+    const g = byDay[date];
+    const avg = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+    return { date, sys: avg(g.sys), dia: avg(g.dia), hr: avg(g.hr) };
+  });
+}
+
+function overallAverageOfDailyAverages(){
+  const days = dailyAverages();
+  if(days.length === 0) return null;
+  const avg = key => days.reduce((a,d)=>a+d[key],0)/days.length;
+  return { sys: avg('sys'), dia: avg('dia'), hr: avg('hr'), giorni: days.length };
+}
+
+/* ---------------- Rendering ---------------- */
+function renderStats(){
+  const container = document.getElementById('statsRow');
+  const overall = overallAverageOfDailyAverages();
+  if(!overall){
+    container.innerHTML = `<div class="stat-card"><div class="label">${T.statSys}</div><div class="value" style="font-size:1.2rem;">${T.noDataStat}</div></div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="stat-card sys">
+      <div class="label">${T.statSys}</div>
+      <div class="value">${overall.sys.toFixed(0)} <span class="unit">${T.unitMmhg}</span></div>
+    </div>
+    <div class="stat-card dia">
+      <div class="label">${T.statDia}</div>
+      <div class="value">${overall.dia.toFixed(0)} <span class="unit">${T.unitMmhg}</span></div>
+    </div>
+    <div class="stat-card hr">
+      <div class="label">${T.statHr}</div>
+      <div class="value">${overall.hr.toFixed(0)} <span class="unit">${T.unitBpm}</span></div>
+    </div>
+    <div class="stat-card days">
+      <div class="label">${T.statDays}</div>
+      <div class="value">${overall.giorni}</div>
+    </div>
+  `;
+}
+
+function renderChart(){
+  const holder = document.getElementById('chartHolder');
+  const days = dailyAverages();
+
+  if(days.length === 0){
+    holder.innerHTML = `<div class="empty-state"><div class="big">📉</div>${T.chartEmpty}</div>`;
+    return;
+  }
+
+  const shown = days.slice(-30);
+  const W = 900, H = 320;
+  const padL = 46, padR = 20, padT = 20, padB = 46;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const allVals = shown.flatMap(d=>[d.sys, d.dia, d.hr]);
+  let minV = Math.min(...allVals, 40);
+  let maxV = Math.max(...allVals, 140);
+  minV = Math.floor(minV/10)*10 - 10;
+  maxV = Math.ceil(maxV/10)*10 + 10;
+
+  const xStep = shown.length > 1 ? plotW / (shown.length - 1) : 0;
+  const yScale = v => padT + plotH - ((v - minV)/(maxV - minV)) * plotH;
+  const xScale = i => padL + i * xStep;
+
+  function linePath(key){
+    return shown.map((d,i)=> `${i===0?'M':'L'} ${xScale(i).toFixed(1)} ${yScale(d[key]).toFixed(1)}`).join(' ');
+  }
+  function dots(key, color){
+    return shown.map((d,i)=>
+      `<circle cx="${xScale(i).toFixed(1)}" cy="${yScale(d[key]).toFixed(1)}" r="4" fill="${color}" stroke="#111" stroke-width="2"/>`
+    ).join('');
+  }
+
+  let gridLines = '';
+  const steps = 5;
+  for(let s=0; s<=steps; s++){
+    const val = minV + (maxV-minV) * s/steps;
+    const y = yScale(val);
+    gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#111" stroke-opacity="0.12" stroke-width="1"/>`;
+    gridLines += `<text x="${padL-8}" y="${(y+4).toFixed(1)}" font-size="11" text-anchor="end" font-family="Arial, sans-serif" fill="#111">${val.toFixed(0)}</text>`;
+  }
+
+  let xLabels = '';
+  const labelEvery = Math.max(1, Math.ceil(shown.length / 8));
+  shown.forEach((d,i)=>{
+    if(i % labelEvery === 0 || i === shown.length-1){
+      const [y,m,day] = d.date.split('-');
+      const lbl = T.dateFmt === 'dmy' ? `${day}/${m}` : `${m}/${day}`;
+      xLabels += `<text x="${xScale(i).toFixed(1)}" y="${H-padB+20}" font-size="11" text-anchor="middle" font-family="Arial, sans-serif" fill="#111">${lbl}</text>`;
+    }
+  });
+
+  const svg = `
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="${W-2}" height="${H-2}" fill="white" stroke="#111" stroke-width="3"/>
+    ${gridLines}
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#111" stroke-width="2"/>
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#111" stroke-width="2"/>
+    <path d="${linePath('sys')}" fill="none" stroke="#FF4FA0" stroke-width="3.5"/>
+    <path d="${linePath('dia')}" fill="none" stroke="#3E7BFA" stroke-width="3.5"/>
+    <path d="${linePath('hr')}"  fill="none" stroke="#33D17A" stroke-width="3.5"/>
+    ${dots('sys','#FF4FA0')}
+    ${dots('dia','#3E7BFA')}
+    ${dots('hr','#33D17A')}
+    ${xLabels}
+  </svg>`;
+
+  holder.innerHTML = svg;
+}
+
+function renderTable(){
+  const holder = document.getElementById('tableHolder');
+  if(data.length === 0){
+    holder.innerHTML = `<div class="empty-state"><div class="big">🗒️</div>${T.tableEmpty}</div>`;
+    return;
+  }
+  const sorted = [...data].sort((a,b)=>{
+    const da = a.date + 'T' + a.time;
+    const db = b.date + 'T' + b.time;
+    return db.localeCompare(da);
+  });
+
+  const rows = sorted.map(m=>{
+    const isHigh = m.sys >= 140 || m.dia >= 90;
+    const badge = isHigh ? `<span class="badge high">${T.badgeHigh}</span>` : `<span class="badge ok">${T.badgeOk}</span>`;
+    return `
+      <tr>
+        <td>${fmtDateLocal(m.date)}</td>
+        <td>${m.time}</td>
+        <td>${m.sys}</td>
+        <td>${m.dia}</td>
+        <td>${m.hr}</td>
+        <td>${badge}</td>
+        <td>
+          <button class="icon-btn edit" title="${T.editTitle}" data-id="${m.id}">✏️</button>
+          <button class="icon-btn del" title="${T.deleteIconTitle}" data-id="${m.id}">🗑️</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  holder.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>${T.thDate}</th>
+            <th>${T.thTime}</th>
+            <th>${T.thSys}</th>
+            <th>${T.thDia}</th>
+            <th>${T.thHr}</th>
+            <th>${T.thStatus}</th>
+            <th>${T.thActions}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  holder.querySelectorAll('.icon-btn.edit').forEach(btn=>{
+    btn.addEventListener('click', ()=> openEditForm(btn.dataset.id));
+  });
+  holder.querySelectorAll('.icon-btn.del').forEach(btn=>{
+    btn.addEventListener('click', ()=> openDeleteConfirm(btn.dataset.id));
+  });
+}
+
+function renderAll(){
+  renderStats();
+  renderChart();
+  renderTable();
+}
+
+/* ---------------- Add/edit form ---------------- */
+const formOverlay = document.getElementById('formOverlay');
+const form = document.getElementById('measureForm');
+const formTitle = document.getElementById('formTitle');
+
+function openAddForm(){
+  form.reset();
+  document.getElementById('editId').value = '';
+  document.getElementById('fDate').value = todayStr();
+  document.getElementById('fTime').value = nowTimeStr();
+  formTitle.textContent = T.formTitleNew;
+  formOverlay.classList.add('show');
+  document.getElementById('fSys').focus();
+}
+
+function openEditForm(id){
+  const m = data.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('editId').value = m.id;
+  document.getElementById('fDate').value = m.date;
+  document.getElementById('fTime').value = m.time;
+  document.getElementById('fSys').value = m.sys;
+  document.getElementById('fDia').value = m.dia;
+  document.getElementById('fHr').value = m.hr;
+  formTitle.textContent = T.formTitleEdit;
+  formOverlay.classList.add('show');
+}
+
+function closeForm(){
+  formOverlay.classList.remove('show');
+}
+
+document.getElementById('btnAdd').addEventListener('click', openAddForm);
+document.getElementById('btnCancelForm').addEventListener('click', closeForm);
+formOverlay.addEventListener('click', e=>{ if(e.target === formOverlay) closeForm(); });
+
+form.addEventListener('submit', e=>{
+  e.preventDefault();
+  const id = document.getElementById('editId').value;
+  const record = {
+    id: id || uid(),
+    date: document.getElementById('fDate').value,
+    time: document.getElementById('fTime').value,
+    sys: Number(document.getElementById('fSys').value),
+    dia: Number(document.getElementById('fDia').value),
+    hr: Number(document.getElementById('fHr').value),
+  };
+  if(id){
+    const idx = data.findIndex(x=>x.id===id);
+    if(idx > -1) data[idx] = record;
+  } else {
+    data.push(record);
+  }
+  saveData(data);
+  closeForm();
+  renderAll();
+});
+
+/* ---------------- Delete confirm ---------------- */
+const deleteOverlay = document.getElementById('deleteOverlay');
+
+function openDeleteConfirm(id){
+  deleteTargetId = id;
+  deleteOverlay.classList.add('show');
+}
+function closeDeleteConfirm(){
+  deleteTargetId = null;
+  deleteOverlay.classList.remove('show');
+}
+document.getElementById('btnCancelDelete').addEventListener('click', closeDeleteConfirm);
+deleteOverlay.addEventListener('click', e=>{ if(e.target === deleteOverlay) closeDeleteConfirm(); });
+document.getElementById('btnConfirmDelete').addEventListener('click', ()=>{
+  data = data.filter(x=>x.id !== deleteTargetId);
+  saveData(data);
+  closeDeleteConfirm();
+  renderAll();
+});
+
+/* ---------------- Init ---------------- */
+applyStaticStrings();
+renderAll();
+</script>
+</body>
+</html>
