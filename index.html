@@ -175,6 +175,10 @@
   .icon-btn.edit:hover{ background:var(--yellow); }
   .icon-btn.del:hover{ background:var(--red); color:white; }
 
+  html, body{ overflow-x:hidden; max-width:100%; }
+
+  input, select, textarea{ min-width:0; max-width:100%; }
+
   /* Modal */
   .overlay{
     position:fixed; inset:0;
@@ -184,6 +188,8 @@
     justify-content:center;
     z-index:50;
     padding:20px;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .overlay.show{ display:flex; }
   .modal{
@@ -193,6 +199,12 @@
     padding: 26px;
     width: 100%;
     max-width: 420px;
+    max-height: 85vh;
+    max-height: 85dvh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    box-sizing:border-box;
+    margin: auto;
   }
   .modal h2{ margin-bottom: 18px; font-size:1.3rem; }
   .modal.confirm h2{ color: var(--red); }
@@ -217,6 +229,8 @@
   .field input:focus{ outline:none; background:#FFF3B0; }
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
+  .modal .btn{ white-space:normal; text-align:center; }
+
   .modal-actions{
     display:flex;
     justify-content:flex-end;
@@ -235,7 +249,56 @@
   @media (max-width:520px){
     .row2{ grid-template-columns:1fr; }
     body{ padding:14px; }
+    .overlay{ align-items:flex-start; padding: 16px 12px 40px; }
+    .modal{ max-height: none; padding: 20px; }
+    .share-box{ flex-direction:column; }
+    .share-box input{ font-size:0.72rem; }
   }
+
+  .header-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+  .share-box{
+    display:flex;
+    gap:8px;
+    align-items:stretch;
+    margin-bottom:10px;
+  }
+  .share-box input{
+    flex:1;
+    border:3px solid var(--black);
+    padding:10px 12px;
+    font-family: monospace;
+    font-size:0.8rem;
+    background:#f5f5f5;
+    word-break: break-all;
+  }
+  .share-meta{
+    font-family:Arial, sans-serif;
+    font-size:0.78rem;
+    opacity:0.75;
+    margin-top:6px;
+  }
+  .share-meta.warn{ color:var(--red); opacity:1; font-weight:bold; }
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform: translateX(-50%) translateY(20px);
+    background:var(--black);
+    color:var(--cream);
+    border:3px solid var(--black);
+    box-shadow: 6px 6px 0 rgba(0,0,0,0.35);
+    padding: 12px 20px;
+    font-family:Arial, sans-serif;
+    font-weight:bold;
+    font-size:0.9rem;
+    z-index:100;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); pointer-events:auto; }
 </style>
 </head>
 <body>
@@ -245,7 +308,10 @@
     <h1 id="t_title">🩺 Pressometro</h1>
     <div class="sub" id="t_subtitle">Registro pressione e battiti — i dati restano solo su questo dispositivo</div>
   </div>
-  <button class="btn primary" id="btnAdd"></button>
+  <div class="header-actions">
+    <button class="btn secondary" id="btnShare"></button>
+    <button class="btn primary" id="btnAdd"></button>
+  </div>
 </div>
 
 <div class="stats-row" id="statsRow"></div>
@@ -321,6 +387,36 @@
   </div>
 </div>
 
+<!-- Share modal -->
+<div class="overlay" id="shareOverlay">
+  <div class="modal">
+    <h2 id="t_shareTitle"></h2>
+    <p class="share-meta" id="t_shareDesc" style="margin-bottom:12px;"></p>
+    <div class="share-box">
+      <input type="text" id="shareUrlInput" readonly>
+      <button type="button" class="btn primary" id="btnCopyShare"></button>
+    </div>
+    <div class="share-meta" id="shareCharCount"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="btnCloseShare"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Import conflict modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal confirm">
+    <h2 id="t_importTitle"></h2>
+    <p style="font-family:Arial, sans-serif;" id="t_importBody"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="btnKeepMine"></button>
+      <button type="button" class="btn danger" id="btnOverwriteMine"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
 const STORAGE_KEY = 'pressometro_misurazioni_v1';
 
@@ -361,7 +457,27 @@ const STRINGS = {
     thDate: 'Data', thTime: 'Ora', thSys: 'Sist.', thDia: 'Diast.', thHr: 'Batt.', thStatus: 'Stato', thActions: 'Azioni',
     badgeHigh: 'ALTA', badgeOk: 'OK',
     editTitle: 'Modifica', deleteIconTitle: 'Elimina',
-    dateFmt: 'dmy'
+    dateFmt: 'dmy',
+    shareBtn: '🔗 Condividi',
+    shareTitle: 'Condividi i tuoi dati',
+    shareDesc: 'Invia questo link a un altro dispositivo o persona per trasferire lo storico.',
+    copyBtn: 'Copia link',
+    copiedBtn: '✓ Copiato!',
+    close: 'Chiudi',
+    charCount: n => `${n} caratteri nel link`,
+    charWarn: 'Il link è piuttosto lungo: alcune app (SMS, alcuni browser datati) potrebbero troncarlo. Preferisci email, chat o QR code se possibile.',
+    importTitle: 'Dati condivisi differenti trovati',
+    importBody: (nNew, nConf) => {
+      let parts = [];
+      if(nNew > 0) parts.push(`${nNew} nuove misurazioni sono già state aggiunte al tuo storico.`);
+      parts.push(`${nConf} misurazioni ricevute hanno data/ora uguale a misurazioni che hai già, ma valori diversi. Vuoi sovrascriverle con i valori ricevuti dal link, oppure mantenere i tuoi?`);
+      return parts.join(' ');
+    },
+    keepMine: 'Mantieni i miei',
+    overwriteMine: 'Sovrascrivi con i ricevuti',
+    toastAdded: n => `${n} nuove misurazioni aggiunte dal link condiviso.`,
+    toastOverwritten: n => `${n} misurazioni aggiornate con i valori ricevuti.`,
+    toastKept: 'Hai mantenuto i tuoi valori originali.'
   },
   en: {
     pageTitle: 'Blood Pressure Tracker',
@@ -395,7 +511,27 @@ const STRINGS = {
     thDate: 'Date', thTime: 'Time', thSys: 'Sys.', thDia: 'Dia.', thHr: 'HR', thStatus: 'Status', thActions: 'Actions',
     badgeHigh: 'HIGH', badgeOk: 'OK',
     editTitle: 'Edit', deleteIconTitle: 'Delete',
-    dateFmt: 'mdy'
+    dateFmt: 'mdy',
+    shareBtn: '🔗 Share',
+    shareTitle: 'Share your data',
+    shareDesc: 'Send this link to another device or person to transfer the history.',
+    copyBtn: 'Copy link',
+    copiedBtn: '✓ Copied!',
+    close: 'Close',
+    charCount: n => `${n} characters in the link`,
+    charWarn: 'This link is quite long: some apps (SMS, some older browsers) may truncate it. Prefer email, chat, or a QR code if possible.',
+    importTitle: 'Different shared data found',
+    importBody: (nNew, nConf) => {
+      let parts = [];
+      if(nNew > 0) parts.push(`${nNew} new readings have already been added to your history.`);
+      parts.push(`${nConf} received readings share the same date/time as readings you already have, but with different values. Do you want to overwrite them with the received values, or keep yours?`);
+      return parts.join(' ');
+    },
+    keepMine: 'Keep mine',
+    overwriteMine: 'Overwrite with received',
+    toastAdded: n => `${n} new readings added from the shared link.`,
+    toastOverwritten: n => `${n} readings updated with received values.`,
+    toastKept: 'You kept your original values.'
   }
 };
 const T = STRINGS[LANG];
@@ -425,6 +561,15 @@ function applyStaticStrings(){
   document.getElementById('t_deleteBody').textContent = T.deleteBody;
   document.getElementById('btnCancelDelete').textContent = T.cancel;
   document.getElementById('btnConfirmDelete').textContent = T.delete;
+
+  document.getElementById('btnShare').textContent = T.shareBtn;
+  document.getElementById('t_shareTitle').textContent = T.shareTitle;
+  document.getElementById('t_shareDesc').textContent = T.shareDesc;
+  document.getElementById('btnCopyShare').textContent = T.copyBtn;
+  document.getElementById('btnCloseShare').textContent = T.close;
+  document.getElementById('t_importTitle').textContent = T.importTitle;
+  document.getElementById('btnKeepMine').textContent = T.keepMine;
+  document.getElementById('btnOverwriteMine').textContent = T.overwriteMine;
 }
 
 /* ---------------- Data layer ---------------- */
@@ -720,9 +865,194 @@ document.getElementById('btnConfirmDelete').addEventListener('click', ()=>{
   renderAll();
 });
 
+/* ---------------- Toast ---------------- */
+let toastTimer = null;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 3800);
+}
+
+/* ---------------- Compact serialization ---------------- */
+// date "YYYY-MM-DD" -> "YYYYMMDD", time "HH:MM" -> "HHMM", joined with | and records with ;
+function serializeRecords(records){
+  const sorted = [...records].sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+  return sorted.map(r => `${r.date.replace(/-/g,'')}|${r.time.replace(':','')}|${r.sys}|${r.dia}|${r.hr}`).join(';');
+}
+function deserializeRecords(str){
+  if(!str) return [];
+  return str.split(';').filter(Boolean).map(chunk=>{
+    const parts = chunk.split('|');
+    if(parts.length < 5) return null;
+    const [d,t,sys,dia,hr] = parts;
+    const date = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+    const time = `${t.slice(0,2)}:${t.slice(2,4)}`;
+    return { date, time, sys:Number(sys), dia:Number(dia), hr:Number(hr) };
+  }).filter(Boolean);
+}
+
+/* ---------------- Base64url helpers ---------------- */
+function bufferToBase64Url(buf){
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  for(let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function base64UrlToBuffer(b64url){
+  let b64 = b64url.replace(/-/g,'+').replace(/_/g,'/');
+  while(b64.length % 4) b64 += '=';
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/* ---------------- Compression (native, no external library) ---------------- */
+// Uses the browser's built-in CompressionStream (gzip) to avoid repetition in the URL.
+// Falls back to plain encoding on browsers that lack it.
+async function compressToToken(str){
+  if(typeof CompressionStream !== 'undefined'){
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+    const buf = await new Response(stream).arrayBuffer();
+    return 'g' + bufferToBase64Url(buf);
+  }
+  return 'p' + bufferToBase64Url(new TextEncoder().encode(str).buffer);
+}
+async function decompressFromToken(token){
+  const marker = token[0];
+  const rest = token.slice(1);
+  const buf = base64UrlToBuffer(rest);
+  if(marker === 'g'){
+    if(typeof DecompressionStream === 'undefined') throw new Error('gzip not supported');
+    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  }
+  return new TextDecoder().decode(buf);
+}
+
+/* ---------------- Share ---------------- */
+const shareOverlay = document.getElementById('shareOverlay');
+
+async function handleShare(){
+  if(data.length === 0){
+    showToast(LANG === 'it' ? 'Nessuna misurazione da condividere.' : 'No readings to share.');
+    return;
+  }
+  const token = await compressToToken(serializeRecords(data));
+  const url = `${location.origin}${location.pathname}#share=${token}`;
+
+  const input = document.getElementById('shareUrlInput');
+  input.value = url;
+  document.getElementById('btnCopyShare').textContent = T.copyBtn;
+
+  const countEl = document.getElementById('shareCharCount');
+  const warn = url.length > 1900;
+  countEl.textContent = T.charCount(url.length) + (warn ? ' — ' + T.charWarn : '');
+  countEl.classList.toggle('warn', warn);
+
+  shareOverlay.classList.add('show');
+
+  try{
+    await navigator.clipboard.writeText(url);
+    document.getElementById('btnCopyShare').textContent = T.copiedBtn;
+  }catch(e){ /* clipboard blocked, user can copy manually from the field */ }
+}
+
+document.getElementById('btnShare').addEventListener('click', handleShare);
+document.getElementById('btnCloseShare').addEventListener('click', ()=> shareOverlay.classList.remove('show'));
+shareOverlay.addEventListener('click', e=>{ if(e.target === shareOverlay) shareOverlay.classList.remove('show'); });
+document.getElementById('btnCopyShare').addEventListener('click', async ()=>{
+  const input = document.getElementById('shareUrlInput');
+  input.select();
+  try{
+    await navigator.clipboard.writeText(input.value);
+    document.getElementById('btnCopyShare').textContent = T.copiedBtn;
+  }catch(e){
+    document.execCommand('copy');
+  }
+});
+
+/* ---------------- Import / merge from shared link ---------------- */
+const importOverlay = document.getElementById('importOverlay');
+let pendingConflicts = [];
+
+function applyOverwrite(){
+  pendingConflicts.forEach(c=>{
+    const idx = data.findIndex(r=> r.id === c.local.id);
+    if(idx > -1){
+      data[idx] = { ...data[idx], sys: c.incoming.sys, dia: c.incoming.dia, hr: c.incoming.hr };
+    }
+  });
+  saveData(data);
+  showToast(T.toastOverwritten(pendingConflicts.length));
+  pendingConflicts = [];
+  importOverlay.classList.remove('show');
+  renderAll();
+}
+function applyKeepMine(){
+  showToast(T.toastKept);
+  pendingConflicts = [];
+  importOverlay.classList.remove('show');
+  renderAll();
+}
+document.getElementById('btnOverwriteMine').addEventListener('click', applyOverwrite);
+document.getElementById('btnKeepMine').addEventListener('click', applyKeepMine);
+importOverlay.addEventListener('click', e=>{ if(e.target === importOverlay) applyKeepMine(); });
+
+async function checkForSharedData(){
+  const hash = location.hash;
+  if(!hash || hash.indexOf('#share=') !== 0) return;
+  const token = hash.slice('#share='.length);
+
+  let incoming;
+  try{
+    const str = await decompressFromToken(decodeURIComponent(token));
+    incoming = deserializeRecords(str);
+  }catch(e){
+    console.error('Could not read shared data', e);
+    return;
+  }
+  // clean the URL right away so a refresh doesn't re-trigger the import
+  history.replaceState(null, '', location.pathname + location.search);
+
+  if(!incoming || incoming.length === 0) return;
+
+  const localByKey = new Map(data.map(r=>[r.date+'T'+r.time, r]));
+  const newOnes = [];
+  const conflicts = [];
+
+  incoming.forEach(inc=>{
+    const key = inc.date+'T'+inc.time;
+    const local = localByKey.get(key);
+    if(!local){
+      newOnes.push(inc);
+    } else if(local.sys !== inc.sys || local.dia !== inc.dia || local.hr !== inc.hr){
+      conflicts.push({ local, incoming: inc });
+    }
+  });
+
+  newOnes.forEach(inc=>{
+    data.push({ id: uid(), date: inc.date, time: inc.time, sys: inc.sys, dia: inc.dia, hr: inc.hr });
+  });
+  if(newOnes.length > 0) saveData(data);
+
+  if(conflicts.length > 0){
+    pendingConflicts = conflicts;
+    document.getElementById('t_importBody').textContent = T.importBody(newOnes.length, conflicts.length);
+    importOverlay.classList.add('show');
+    renderAll();
+  } else if(newOnes.length > 0){
+    showToast(T.toastAdded(newOnes.length));
+    renderAll();
+  }
+}
+
 /* ---------------- Init ---------------- */
 applyStaticStrings();
 renderAll();
+checkForSharedData();
 </script>
 </body>
 </html>
