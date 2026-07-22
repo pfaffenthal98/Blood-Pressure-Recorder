@@ -357,29 +357,27 @@
     <h2 id="formTitle"></h2>
     <form id="measureForm">
       <input type="hidden" id="editId">
-      <div class="row2">
-        <div class="field">
-          <label for="fDate" id="t_lblDate">Data</label>
-          <input type="date" id="fDate" required>
-        </div>
-        <div class="field">
-          <label for="fTime" id="t_lblTime">Ora</label>
-          <input type="time" id="fTime" required>
-        </div>
+      <div class="field">
+        <label for="fDate" id="t_lblDate">Data</label>
+        <input type="date" id="fDate" required>
+      </div>
+      <div class="field">
+        <label for="fTime" id="t_lblTime">Ora</label>
+        <input type="time" id="fTime" required>
       </div>
       <div class="row2">
         <div class="field">
           <label for="fSys" id="t_lblSys">Sistolica (max)</label>
-          <input type="number" id="fSys" min="50" max="300" required>
+          <input type="number" id="fSys" min="50" max="300" required inputmode="numeric" pattern="[0-9]*">
         </div>
         <div class="field">
           <label for="fDia" id="t_lblDia">Diastolica (min)</label>
-          <input type="number" id="fDia" min="30" max="200" required>
+          <input type="number" id="fDia" min="30" max="200" required inputmode="numeric" pattern="[0-9]*">
         </div>
       </div>
       <div class="field">
         <label for="fHr" id="t_lblHr">Battiti (bpm)</label>
-        <input type="number" id="fHr" min="20" max="250" required>
+        <input type="number" id="fHr" min="20" max="250" required inputmode="numeric" pattern="[0-9]*">
       </div>
       <div class="modal-actions">
         <button type="button" class="btn secondary" id="btnCancelForm"></button>
