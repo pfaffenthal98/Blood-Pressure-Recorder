@@ -313,6 +313,50 @@
     transition: opacity .2s ease, transform .2s ease;
   }
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); pointer-events:auto; }
+
+  #confettiCanvas{
+    position:fixed;
+    inset:0;
+    z-index:70;
+    pointer-events:none;
+  }
+
+  .celebrate-modal{
+    background:var(--cream);
+    border:4px solid var(--black);
+    box-shadow: 10px 10px 0 var(--black);
+    padding: 20px;
+    width:100%;
+    max-width: 340px;
+    text-align:center;
+    max-height:90vh;
+    max-height:90dvh;
+    overflow-y:auto;
+  }
+  .celebrate-modal .btn{ width:100%; margin: 10px 0; }
+  .celebrate-img-wrap{
+    border:4px solid var(--black);
+    box-shadow: var(--shadow-off-sm);
+    width: 260px;
+    height: 260px;
+    max-width:100%;
+    margin: 4px auto 16px;
+    overflow:hidden;
+    background:#eee;
+  }
+  .celebrate-img-wrap img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .celebrate-caption{
+    font-family:Arial, sans-serif;
+    font-weight:bold;
+    font-size:1.05rem;
+    margin-bottom:6px;
+    line-height:1.35;
+  }
 </style>
 </head>
 <body>
@@ -428,6 +472,20 @@
   </div>
 </div>
 
+<canvas id="confettiCanvas"></canvas>
+
+<!-- Celebration popup -->
+<div class="overlay" id="celebrateOverlay">
+  <div class="celebrate-modal">
+    <button type="button" class="btn primary" id="btnThanksTop"></button>
+    <div class="celebrate-img-wrap">
+      <img id="celebrateImg" src="" alt="Random cat">
+    </div>
+    <div class="celebrate-caption" id="t_celebrateCaption"></div>
+    <button type="button" class="btn primary" id="btnThanksBottom"></button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -491,7 +549,9 @@ const STRINGS = {
     toastAdded: n => `${n} nuove misurazioni aggiunte dal link condiviso.`,
     toastOverwritten: n => `${n} misurazioni aggiornate con i valori ricevuti.`,
     toastKept: 'Hai mantenuto i tuoi valori originali.',
-    scrollHint: '↔ Scorri lateralmente per vedere tutte le colonne'
+    scrollHint: '↔ Scorri lateralmente per vedere tutte le colonne',
+    celebrateCaption: 'Un gatto random è passato a salutarti',
+    thanksBtn: 'Grazie!'
   },
   en: {
     pageTitle: 'Blood Pressure Tracker',
@@ -546,7 +606,9 @@ const STRINGS = {
     toastAdded: n => `${n} new readings added from the shared link.`,
     toastOverwritten: n => `${n} readings updated with received values.`,
     toastKept: 'You kept your original values.',
-    scrollHint: '↔ Swipe sideways to see all columns'
+    scrollHint: '↔ Swipe sideways to see all columns',
+    celebrateCaption: 'A random cat stopped by to say hi',
+    thanksBtn: 'Thanks!'
   }
 };
 const T = STRINGS[LANG];
@@ -586,6 +648,9 @@ function applyStaticStrings(){
   document.getElementById('btnKeepMine').textContent = T.keepMine;
   document.getElementById('btnOverwriteMine').textContent = T.overwriteMine;
   document.getElementById('t_scrollHint').textContent = T.scrollHint;
+  document.getElementById('btnThanksTop').textContent = T.thanksBtn;
+  document.getElementById('btnThanksBottom').textContent = T.thanksBtn;
+  document.getElementById('t_celebrateCaption').textContent = T.celebrateCaption;
 }
 
 /* ---------------- Data layer ---------------- */
@@ -859,6 +924,9 @@ form.addEventListener('submit', e=>{
   saveData(data);
   closeForm();
   renderAll();
+  if(!id){
+    openCelebration();
+  }
 });
 
 /* ---------------- Delete confirm ---------------- */
@@ -880,6 +948,90 @@ document.getElementById('btnConfirmDelete').addEventListener('click', ()=>{
   closeDeleteConfirm();
   renderAll();
 });
+
+/* ---------------- Confetti (single burst, not looping) ---------------- */
+const confettiCanvas = document.getElementById('confettiCanvas');
+const confettiCtx = confettiCanvas.getContext('2d');
+let confettiParticles = [];
+let confettiRAF = null;
+const CONFETTI_COLORS = ['#FF4FA0', '#3E7BFA', '#33D17A', '#FFD400', '#00B8FF', '#111111'];
+
+function resizeConfettiCanvas(){
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfettiCanvas);
+
+function launchConfetti(){
+  resizeConfettiCanvas();
+  const W = confettiCanvas.width;
+  const count = Math.min(140, Math.max(80, Math.floor(W / 4)));
+  confettiParticles = [];
+  for(let i=0;i<count;i++){
+    confettiParticles.push({
+      x: Math.random()*W,
+      y: -20 - Math.random()*W*0.4,
+      w: 6 + Math.random()*6,
+      h: 8 + Math.random()*8,
+      color: CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)],
+      vx: (Math.random()-0.5) * 2.2,
+      vy: 2 + Math.random()*3.2,
+      rot: Math.random()*Math.PI*2,
+      vrot: (Math.random()-0.5) * 0.3,
+      gravity: 0.05 + Math.random()*0.05
+    });
+  }
+  const startTime = performance.now();
+  const MAX_DURATION = 4200;
+
+  if(confettiRAF) cancelAnimationFrame(confettiRAF);
+
+  function tick(now){
+    confettiCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    let anyVisible = false;
+    const elapsed = now - startTime;
+
+    confettiParticles.forEach(p=>{
+      p.vy += p.gravity * 0.15;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vrot;
+      if(p.y < confettiCanvas.height + 30) anyVisible = true;
+
+      confettiCtx.save();
+      confettiCtx.translate(p.x, p.y);
+      confettiCtx.rotate(p.rot);
+      confettiCtx.fillStyle = p.color;
+      confettiCtx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      confettiCtx.restore();
+    });
+
+    if(anyVisible && elapsed < MAX_DURATION){
+      confettiRAF = requestAnimationFrame(tick);
+    } else {
+      confettiCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+      confettiRAF = null;
+      confettiParticles = [];
+    }
+  }
+  confettiRAF = requestAnimationFrame(tick);
+}
+
+/* ---------------- Celebration popup (random cat) ---------------- */
+const celebrateOverlay = document.getElementById('celebrateOverlay');
+
+function openCelebration(){
+  const img = document.getElementById('celebrateImg');
+  img.src = `https://cataas.com/cat?_=${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  celebrateOverlay.classList.add('show');
+  launchConfetti();
+}
+function closeCelebration(){
+  celebrateOverlay.classList.remove('show');
+}
+document.getElementById('btnThanksTop').addEventListener('click', closeCelebration);
+document.getElementById('btnThanksBottom').addEventListener('click', closeCelebration);
+celebrateOverlay.addEventListener('click', e=>{ if(e.target === celebrateOverlay) closeCelebration(); });
 
 /* ---------------- Toast ---------------- */
 let toastTimer = null;
